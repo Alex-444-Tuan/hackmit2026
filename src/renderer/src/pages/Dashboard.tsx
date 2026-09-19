@@ -90,16 +90,12 @@ export default function Dashboard() {
 
   return (
     <div className="dash">
-      <header className="dash__bar">
-        <span className="dash__wordmark">StudyPet</span>
-        <span className="dash__streak">
-          {streak === 0 ? 'No sessions yet' : `${streak} session${streak === 1 ? '' : 's'} today`}
-        </span>
-      </header>
-
       {phase === 'setup' ? (
         <section className="setup">
           <h1 className="setup__title">What are you studying?</h1>
+          <p className="setup__streak">
+            {streak === 0 ? 'No sessions logged yet today' : `${streak} session${streak === 1 ? '' : 's'} today`}
+          </p>
 
           <label className="field">
             <span className="field__label">Subject</span>
