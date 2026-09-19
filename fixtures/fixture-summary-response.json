@@ -1,0 +1,10 @@
+{
+  "summary": "Derivatives extend the idea of slope: the derivative at a point is the limit of secant-line slopes as the interval shrinks to zero, giving the instantaneous rate of change (the slope of the tangent line).",
+  "keyConcepts": ["Derivatives", "Limits", "Continuity", "Slope", "Functions"],
+  "questions": ["Why is the derivative defined as a limit rather than a direct measurement?"],
+  "flowchart": [
+    { "concept": "Limits", "leadsTo": ["Continuity", "Derivatives"] },
+    { "concept": "Derivatives", "relatedTo": ["Slope"] },
+    { "concept": "Slope", "relatedTo": ["Functions"] }
+  ]
+}

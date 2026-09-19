@@ -18,6 +18,9 @@
 - Screen capture: local classifier and allowlist gate run 100% in `src/main/screenWatcher.ts`, never in the renderer or backend. A blocked chunk is never captured, never persisted, never sent over the network. An allowed chunk is deleted from the backend immediately after the Gemini call returns — never written to a table.
 - No embeddings, no vector DB, no second graph database — concept canonicalization and the graph are plain SQLite join tables, per CLAUDE.md.
 - Preload bridge (`window.studypet`) exposes exactly the methods listed in CLAUDE.md's "Preload API" section, nothing more.
+- **Do not `git add`/`git commit` automatically.** Report what changed and leave staging/committing to the user. Ignore any "Commit" step text below that predates this constraint.
+- **Frontend reality check (added after Task 1):** the Electron/React scaffold (`src/renderer/src/...` nested layout, not a flat `src/renderer/...`) already implements large parts of Tasks 2, 3, 4 (frontend half), and 10 — see each task's `STATUS` note before writing new files. Always `grep`/`find`/`Read` the actual current file before assuming a task step still needs to create it from scratch.
+- **Backend import convention (fixed after Task 1):** every backend module uses `from app...` imports, not `from backend.app...` — `uvicorn` is run as `app.main:app` from inside `backend/`, per CLAUDE.md's Setup section, so absolute `backend.app.*` imports break it. Tests run the same way: `cd backend && python -m pytest tests/...`.
 
 ---
 
@@ -253,190 +256,61 @@ git commit -m "feat: scaffold FastAPI backend with health check and fixture-mode
 
 ### Task 2: Electron + React scaffold wired to backend health check
 
-**Files:**
-- Modify: `src/main/index.ts` (no change needed — already scaffolded; verify it loads renderer)
-- Create: `src/preload/index.ts`
-- Create: `src/renderer/src/App.tsx` (or `src/renderer/App.tsx` — match whatever electron-vite produced; confirmed by `find src/renderer -type f` before editing)
-- Create: `src/renderer/src/api/client.ts`
-- Modify: `package.json` (add `axios` dependency — already present per current `package.json`)
+**STATUS: already implemented in the current codebase — this task is verify-and-fix-only, not build-from-scratch.** The scaffold went further than this plan originally assumed (it also includes pieces of Tasks 3, 4, and 10). Re-read before touching anything else downstream so later tasks modify these files instead of re-creating them.
 
-**Interfaces:**
-- Consumes: `GET /health` from Task 1.
-- Produces: `window.studypet` bridge object matching CLAUDE.md's `StudyPetBridge` interface (methods `minimize`, `close`, `showPet`, `hidePet`, `sendSessionState`, `onSessionState`, `openExternal` — `showPet`/`hidePet`/`sendSessionState`/`onSessionState`/`openExternal` are wired to real IPC in Tasks 10 and 13; stub them as no-ops here if their target windows don't exist yet, but keep the exact method names and signatures below since later tasks call them).
+**Actual file layout (electron-vite's nested renderer layout, not the flat one this plan originally assumed):**
+- `src/preload/index.ts` — full `StudyPetBridge` implementation, already matches CLAUDE.md's Preload API exactly (`minimize`, `close`, `showPet`, `hidePet`, `sendSessionState`, `onSessionState`, `openExternal`). Also exports `PetMood`/`SessionState` types and the `StudyPetBridge` type consumed by `src/preload/index.d.ts`.
+- `src/renderer/src/App.tsx` — polls `GET /health` every 10s via `checkHealth()`, renders a status pill, and switches between `Dashboard`/`Capture` views. (Polling every 10s instead of a one-shot check on mount — a reasonable variant, not a bug; leave as-is.)
+- `src/renderer/src/api/client.ts` — axios instance at `http://localhost:8000`, plus `checkHealth()`, `createNote()`, `listNotes()`, `getGraph()`, and `describeError()` for turning axios failures into user-facing messages.
+- `src/renderer/src/api/types.ts` — TS mirrors of the backend's Pydantic models (`Note`, `Concept`, `GraphData`, `StudySession`, `PetState`), matching Task 1/4's camelCase field names.
+- `electron.vite.config.ts` — already configures both `index.html` and `pet.html` as renderer build inputs (this plan's Task 10 assumed this needed to be added later; it's already done).
 
-- [ ] **Step 1: Check actual renderer file layout produced by the scaffold**
+**Step 1: Confirm dependencies install and the app typechecks clean**
 
-Run: `find src/renderer -type f`
-Use whatever path this prints for `App.tsx` and place `api/client.ts` alongside it.
+Run: `npm install` (first time only), then `npm run typecheck`.
 
-- [ ] **Step 2: Write `src/preload/index.ts`**
+Fixing this is part of Task 2, not a separate task: `src/renderer/src/components/Versions.tsx` is unused leftover electron-vite template boilerplate that references `window.electron`, which doesn't exist — the preload only exposes `window.studypet`, per CLAUDE.md's Preload API section ("nothing more"). Confirm nothing imports it (`grep -rn "Versions" src/renderer/src`), then delete the file. Re-run `npm run typecheck` — expect it to pass clean.
 
-```typescript
-import { contextBridge, ipcRenderer } from 'electron'
+**Step 2: Confirm the CORS origin actually matches the dev server port**
 
-const bridge = {
-  minimize: () => ipcRenderer.send('window:minimize'),
-  close: () => ipcRenderer.send('window:close'),
-  showPet: () => ipcRenderer.send('pet:show'),
-  hidePet: () => ipcRenderer.send('pet:hide'),
-  sendSessionState: (state: { mood: string; secondsLeft: number; streak: number }) =>
-    ipcRenderer.send('session-state-changed', state),
-  onSessionState: (cb: (state: { mood: string; secondsLeft: number; streak: number }) => void) => {
-    const listener = (_event: unknown, state: { mood: string; secondsLeft: number; streak: number }) =>
-      cb(state)
-    ipcRenderer.on('session-state-changed', listener)
-    return () => ipcRenderer.removeListener('session-state-changed', listener)
-  },
-  openExternal: (url: string) => ipcRenderer.send('open-external', url)
-}
+Run: `grep -n "allow_origins" backend/app/main.py` (expect `http://localhost:5173`, electron-vite's default renderer dev port — no explicit port override exists in `electron.vite.config.ts`, so this is the actual port `npm run dev` will use).
 
-contextBridge.exposeInMainWorld('studypet', bridge)
-```
+**Step 3: Manual verification**
 
-- [ ] **Step 3: Write `src/renderer/.../api/client.ts`**
+Run backend (`cd backend && source venv/bin/activate && uvicorn app.main:app --reload --port 8000`) in one terminal, `npm run dev` in another.
+Expected: Electron window opens showing the `App.tsx` shell with a "backend up" status pill (not "checking"/"backend down").
 
-```typescript
-import axios from 'axios'
+**Step 4: Leave staging/committing to the user**
 
-export const api = axios.create({ baseURL: 'http://localhost:8000' })
-
-export async function getHealth(): Promise<{ status: string }> {
-  const response = await api.get('/health')
-  return response.data
-}
-```
-
-- [ ] **Step 4: Update `App.tsx` to call `getHealth()` on mount and render the status**
-
-```tsx
-import { useEffect, useState } from 'react'
-import { getHealth } from './api/client'
-
-export default function App(): JSX.Element {
-  const [status, setStatus] = useState('checking...')
-
-  useEffect(() => {
-    getHealth()
-      .then((res) => setStatus(res.status))
-      .catch(() => setStatus('backend unreachable'))
-  }, [])
-
-  return <div>Backend status: {status}</div>
-}
-```
-
-- [ ] **Step 5: Manual verification**
-
-Run backend (`uvicorn app.main:app --reload --port 8000`) in one terminal, `npm run dev` in another.
-Expected: Electron window opens and shows "Backend status: ok".
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/preload/index.ts src/renderer/ package.json package-lock.json
-git commit -m "feat: wire Electron renderer to backend health check, add preload bridge skeleton"
-```
+Per project convention for this session, do not `git add`/`git commit` automatically — surface what changed and let the user review and commit it themselves.
 
 ---
 
 ### Task 3: Dashboard timer (session start/pause/finish)
 
-**Files:**
-- Create: `src/renderer/.../pages/Dashboard.tsx`
-- Create: `src/renderer/.../components/SessionTimer.tsx`
-- Modify: `App.tsx` to render `Dashboard`
+**STATUS: already implemented in `src/renderer/src/pages/Dashboard.tsx`** — no separate `SessionTimer.tsx` exists; the timer logic is inlined directly in `Dashboard.tsx` (a reasonable variant, not a gap). It already satisfies the interface this task originally specified:
 
-**Interfaces:**
-- Produces: `SessionTimer` component taking `endTimestampMs: number | null` and `onFinish: () => void` props; computes remaining time from `Date.now()`, not `setInterval` ticks alone.
+- Timestamp-based: `endAtRef` holds an absolute `Date.now() + duration` timestamp, recomputed on every tick — never accumulated from interval ticks, with a comment explaining why (Chromium throttling when hidden/minimized).
+- `setup` / `running` / `paused` / `done` phases, matching "start/pause/finish".
+- Already calls `window.studypet?.sendSessionState({mood, secondsLeft, streak})` and `showPet()`/`hidePet()` on session start/end — this is Task 10's wiring, already done here too.
+- Streak is currently tracked only in local React state (`setStreak((s) => s + 1)` on finish) — this is expected at this stage; Task 11 replaces it with the real backend-persisted streak from `PetStateORM`.
 
-- [ ] **Step 1: Write `SessionTimer.tsx`**
-
-```tsx
-import { useEffect, useState } from 'react'
-
-interface Props {
-  endTimestampMs: number | null
-  onFinish: () => void
-}
-
-export function SessionTimer({ endTimestampMs, onFinish }: Props): JSX.Element | null {
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (endTimestampMs === null) {
-      setSecondsLeft(null)
-      return
-    }
-    const tick = (): void => {
-      const remaining = Math.max(0, Math.round((endTimestampMs - Date.now()) / 1000))
-      setSecondsLeft(remaining)
-      if (remaining === 0) onFinish()
-    }
-    tick()
-    const interval = setInterval(tick, 1000)
-    return () => clearInterval(interval)
-  }, [endTimestampMs, onFinish])
-
-  if (secondsLeft === null) return null
-  const minutes = Math.floor(secondsLeft / 60)
-  const seconds = secondsLeft % 60
-  return (
-    <div>
-      {minutes}:{seconds.toString().padStart(2, '0')}
-    </div>
-  )
-}
-```
-
-- [ ] **Step 2: Write `Dashboard.tsx`**
-
-```tsx
-import { useState } from 'react'
-import { SessionTimer } from '../components/SessionTimer'
-
-export function Dashboard(): JSX.Element {
-  const [goal, setGoal] = useState('')
-  const [durationMinutes, setDurationMinutes] = useState(25)
-  const [endTimestampMs, setEndTimestampMs] = useState<number | null>(null)
-
-  const start = (): void => setEndTimestampMs(Date.now() + durationMinutes * 60_000)
-  const finish = (): void => setEndTimestampMs(null)
-
-  return (
-    <div>
-      <input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Study goal" />
-      <input
-        type="number"
-        value={durationMinutes}
-        onChange={(e) => setDurationMinutes(Number(e.target.value))}
-      />
-      <button onClick={start}>Start</button>
-      <SessionTimer endTimestampMs={endTimestampMs} onFinish={finish} />
-    </div>
-  )
-}
-```
-
-- [ ] **Step 3: Render `Dashboard` from `App.tsx`, manually verify timer counts down and reaches 0**
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/renderer/
-git commit -m "feat: add dashboard with goal input and timestamp-based session timer"
-```
+**Nothing to build for this task.** Verify only: `npm run dev` with the Task 1 backend running, start a session, confirm the ring/clock count down and the pet window (Task 10) shows the studying face.
 
 ---
 
 ### Task 4: Capture screen → `POST /notes` (raw content only) + seed-notes loading
+
+**Frontend is already done — this task is backend-only now.** `src/renderer/src/pages/Capture.tsx` already exists (paste text, upload `.txt`/`.md`, title guessing, error display) and already calls `createNote({title, source, rawContent})` from `api/client.ts`, which POSTs exactly the `{title, source, sourceUrl?, rawContent}` shape this task's backend expects and reads back a `Note` matching `api/types.ts` field-for-field. Nothing to change on the frontend side; do not recreate `Capture.tsx`.
 
 **Files:**
 - Create: `backend/app/db_models.py` (SQLAlchemy ORM models: `NoteORM`, `ConceptORM`, `NoteConceptORM`, `ConceptLinkORM`, `SessionORM`, `PetStateORM` — full schema now so later tasks don't need migrations)
 - Modify: `backend/app/routes/notes.py` (implement `POST /notes`)
 - Modify: `backend/app/db.py` (add `seed_if_empty(db)` called from `init_db`)
 - Create: `fixtures/seed-notes.json`
-- Create: `src/renderer/.../pages/Capture.tsx`
 - Test: `backend/tests/test_notes.py`
+
+**Reminder:** use `from app...` imports in every backend file (not `from backend.app...`) — see Task 1's fix; `uvicorn` is run as `app.main:app` from inside `backend/`, so absolute `backend.app.*` imports break it.
 
 **Interfaces:**
 - Consumes: `CamelModel` from `models.py`.
@@ -738,36 +612,9 @@ def test_seed_notes_load_on_startup():
 
 Run: `cd backend && python -m pytest tests/test_notes.py -v`
 
-- [ ] **Step 7: Write `Capture.tsx`**
+- [ ] **Step 7: Manual verification** — paste text into the existing `Capture.tsx` UI, confirm a row appears in `backend/studypet.db`'s `notes` table (`sqlite3 backend/studypet.db "select title from notes;"`) and that the 4 seed notes are present on first run. No frontend file changes needed for this task.
 
-```tsx
-import { useState } from 'react'
-import { api } from '../api/client'
-
-export function Capture(): JSX.Element {
-  const [text, setText] = useState('')
-
-  const submit = async (): Promise<void> => {
-    await api.post('/notes', { title: 'Untitled', source: 'pasted-text', rawContent: text })
-  }
-
-  return (
-    <div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} />
-      <button onClick={submit}>Save</button>
-    </div>
-  )
-}
-```
-
-- [ ] **Step 8: Manual verification** — paste text in Capture, confirm a row appears in `backend/studypet.db`'s `notes` table (`sqlite3 backend/studypet.db "select title from notes;"`) and that the 4 seed notes are present on first run.
-
-- [ ] **Step 9: Commit**
-
-```bash
-git add backend/ fixtures/seed-notes.json src/renderer/
-git commit -m "feat: add note capture endpoint, full db schema, and seed-notes loading"
-```
+- [ ] **Step 8: Leave staging/committing to the user** — do not `git add`/`git commit`; report what changed.
 
 ---
 
@@ -1017,8 +864,8 @@ git commit -m "feat: canonicalize note concepts into shared concept graph tables
 ### Task 7: Render summary + Mermaid flowchart
 
 **Files:**
-- Create: `src/renderer/.../pages/NoteView.tsx`
-- Create: `src/renderer/.../components/FlowchartView.tsx`
+- Create: `src/renderer/src/pages/NoteView.tsx`
+- Create: `src/renderer/src/components/FlowchartView.tsx`
 
 **Interfaces:**
 - Produces: `FlowchartView({ flowchart }: { flowchart: FlowchartEdge[] })` — builds a Mermaid `graph TD` string in code (never asks the LLM for Mermaid syntax), sanitizing node IDs as `n0`, `n1`, ... and quoting concept names as labels.
@@ -1095,7 +942,7 @@ git commit -m "feat: render note summary and mermaid flowchart from structured b
 **Files:**
 - Modify: `backend/app/routes/notes.py` (compute `related_note_ids` after canonicalization, call connector sentence)
 - Modify: `backend/app/llm.py` (add `connection_sentence` fixture + live call)
-- Create: `src/renderer/.../components/RelatedNotes.tsx`
+- Create: `src/renderer/src/components/RelatedNotes.tsx`
 - Test: `backend/tests/test_related_notes.py`
 
 **Interfaces:**
@@ -1182,8 +1029,8 @@ git commit -m "feat: compute related notes by shared concept count and generate 
 
 **Files:**
 - Modify: `backend/app/routes/graph.py` (implement real `GET /graph`)
-- Create: `src/renderer/.../components/KnowledgeGraph.tsx`
-- Create: `src/renderer/.../pages/GraphView.tsx`
+- Create: `src/renderer/src/components/KnowledgeGraph.tsx`
+- Create: `src/renderer/src/pages/GraphView.tsx`
 - Test: `backend/tests/test_graph.py`
 
 **Interfaces:**
@@ -1273,94 +1120,19 @@ git commit -m "feat: implement knowledge graph endpoint and force-graph view"
 
 ### Task 10: Pet window with mood sync
 
-**Files:**
-- Create: `src/main/petWindow.ts`
-- Modify: `src/main/index.ts` (create pet window, relay `session-state-changed` IPC, handle `pet:show`/`pet:hide`/`window:minimize`/`window:close`)
-- Create: `src/renderer/pet-window/PetRoot.tsx`
-- Create: `pet.html`
-- Modify: `electron.vite.config.ts` (add `pet.html` as second renderer input)
-- Create: `src/renderer/.../components/Pet.tsx`
+**STATUS: already implemented.** Actual files, already working, do not recreate:
 
-**Interfaces:**
-- Consumes: `window.studypet.sendSessionState`/`onSessionState` from Task 2's preload.
-- Produces: Pet window showing CSS/emoji pet with mood classes `studying`/`distracted`/`celebrating`/`idle`, no polling.
+- `src/main/petWindow.ts` — `createPetWindow()`/`showPetWindow()`/`hidePetWindow()`/`getPetWindow()`. More complete than this plan assumed: positions the window bottom-right of the work area, frameless, transparent, `skipTaskbar`, `alwaysOnTop(true, 'floating')`, and guards against double-creation via an `alive()` check.
+- `src/main/index.ts` — creates the pet window in `app.whenReady()`, and wires the IPC relay with channel names that differ from (and are cleaner than) this plan's original assumption: the renderer sends on `'session-state'` (see `preload/index.ts`'s `sendSessionState`), main relays it to the pet window on `'session-state-changed'` (see `preload/index.ts`'s `onSessionState`, which listens on that name). Also already wires `pet:show`/`pet:hide`/`window:minimize`/`window:close` and a `open-external` handler restricted to `https://www.youtube.com/watch` — that last part satisfies CLAUDE.md's Preload API note ahead of Task 12's YouTube stretch step.
+- `src/renderer/pet.html` + `src/renderer/src/pet.tsx` — the pet window's own HTML/React entry.
+- `src/renderer/src/pet-window/PetRoot.tsx` — renders mood-specific face + line text + streak, listens via `window.studypet.onSessionState`, unsubscribes on unmount. Moods: `idle`/`studying`/`distracted`/`celebrating`, matching CLAUDE.md's `PetState["mood"]` union exactly.
+- `electron.vite.config.ts` — `pet.html` is already a second `rollupOptions.input` entry.
+- No separate `Pet.tsx` component exists — the main-window side of `sendSessionState` is inlined directly in `Dashboard.tsx` (see Task 3), which is fine; don't add a redundant wrapper component.
 
-- [ ] **Step 1: Write `src/main/petWindow.ts`**
+**Nothing to build for this task.** Verify only:
 
-```typescript
-import { BrowserWindow, join } from 'electron'
-import { is } from '@electron-toolkit/utils'
-
-let petWindow: BrowserWindow | null = null
-
-export function createPetWindow(): BrowserWindow {
-  petWindow = new BrowserWindow({
-    width: 220,
-    height: 220,
-    alwaysOnTop: true,
-    frame: false,
-    resizable: false,
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
-  })
-
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    petWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pet.html`)
-  } else {
-    petWindow.loadFile(join(__dirname, '../renderer/pet.html'))
-  }
-
-  return petWindow
-}
-
-export function getPetWindow(): BrowserWindow | null {
-  return petWindow
-}
-```
-
-- [ ] **Step 2: Modify `src/main/index.ts`** — import `createPetWindow`, `getPetWindow`; call `createPetWindow()` in `app.whenReady()`; add:
-
-```typescript
-ipcMain.on('session-state-changed', (_event, state) => {
-  getPetWindow()?.webContents.send('session-state-changed', state)
-})
-ipcMain.on('pet:show', () => getPetWindow()?.show())
-ipcMain.on('pet:hide', () => getPetWindow()?.hide())
-```
-
-- [ ] **Step 3: Write `pet.html`** (minimal HTML entry loading `PetRoot.tsx`, mirroring the main `index.html`'s structure).
-
-- [ ] **Step 4: Add `pet.html` as a second input in `electron.vite.config.ts`**'s renderer `build.rollupOptions.input`.
-
-- [ ] **Step 5: Write `PetRoot.tsx`**
-
-```tsx
-import { useEffect, useState } from 'react'
-
-type Mood = 'studying' | 'distracted' | 'celebrating' | 'idle'
-
-const EMOJI: Record<Mood, string> = { studying: '📖', distracted: '❓', celebrating: '🎉', idle: '😴' }
-
-export default function PetRoot(): JSX.Element {
-  const [mood, setMood] = useState<Mood>('idle')
-
-  useEffect(() => {
-    return window.studypet.onSessionState((state) => setMood(state.mood as Mood))
-  }, [])
-
-  return <div className={`pet pet--${mood}`}>{EMOJI[mood]}</div>
-}
-```
-
-- [ ] **Step 6: Write `Pet.tsx`** (main-window-side component, calls `window.studypet.sendSessionState({mood, secondsLeft, streak})` whenever `Dashboard`'s timer state changes).
-
-- [ ] **Step 7: Manual verification** — start a session, confirm pet window shows the studying emoji; this is IPC-relayed (main → pet), not polled or backend-round-tripped (verify by checking no network tab activity from the pet window).
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add src/
-git commit -m "feat: add floating pet window synced via IPC relay from main window"
-```
+- [ ] **Step 1:** `npm run dev`, start a session from `Dashboard`, confirm the floating pet window appears bottom-right showing the studying face, and that opening DevTools' Network tab on the pet window shows zero requests (mood sync is IPC-relayed, not polled or backend-round-tripped, per CLAUDE.md).
+- [ ] **Step 2:** Let a session finish, confirm the pet window switches to the celebrating face/line.
 
 ---
 
@@ -1368,7 +1140,7 @@ git commit -m "feat: add floating pet window synced via IPC relay from main wind
 
 **Files:**
 - Modify: `backend/app/routes/sessions.py` (implement `POST /sessions`, `PATCH /sessions/{id}/complete`)
-- Modify: `src/renderer/.../pages/Dashboard.tsx` (call session endpoints, celebrate on finish, send `mood: 'celebrating'`)
+- Modify: `src/renderer/src/pages/Dashboard.tsx` (call session endpoints, celebrate on finish, send `mood: 'celebrating'`)
 - Test: `backend/tests/test_sessions.py`
 
 **Interfaces:**
@@ -1464,7 +1236,7 @@ git commit -m "feat: log session completion and increment pet streak"
 
 ## Part 2 — Screen Capture (docs/screen-capture-spec.md)
 
-**Do not start Part 2 until Part 1's Task 11 manual verification (Step 5) has passed.**
+**Reprioritized (2026-09-19): Part 2 now runs ahead of the rest of Part 1, by explicit user decision.** Only build the specific Part 1 pieces Task 13's `session-batch` endpoint actually calls — `db_models.py` (Task 4's ORM schema), `concepts.py`'s canonicalization (Task 6), `compute_related_note_ids` (Task 8), and `llm.py`'s `summarize`/`connection_sentence` (Tasks 5 and 8) — as dependencies, not the frontend/UI portions of Tasks 4–11 (Mermaid rendering, graph view, related-notes panel, pet streak persistence). Task 12 (`screenWatcher.ts`/`allowlist.ts`) has no Part 1 dependency at all and can be built standalone first.
 
 ### Task 12: Local classifier + fail-closed allowlist gate (`screenWatcher.ts`)
 

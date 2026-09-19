@@ -255,7 +255,9 @@ No embeddings, no fuzzy matching library. Only add one if the demo fixtures visi
 
 ## Build order
 
-Work top to bottom. After each step, the app should still run. Never leave it in a broken state overnight.
+**Current sprint reprioritization (2026-09-19):** screen capture is now the active focus. Steps 5–11 below are built only as far as screen capture's Path B actually needs (DB schema for notes/concepts/links, concept canonicalization, the summarize and connection-sentence LLM calls) — not their frontend polish (flowchart rendering, graph view, related-notes UI, pet streak persistence). Step 1 (backend skeleton) and step 2 (Electron shell + preload bridge) are already done. Screen capture's own build steps live in `docs/screen-capture-spec.md` and `docs/superpowers/plans/2026-09-19-core-app-and-screen-capture.md` (Part 2, Tasks 12–14) and now run ahead of the remaining Part 1 polish, not after it.
+
+Work top to bottom otherwise. After each step, the app should still run. Never leave it in a broken state overnight.
 
 1. Scaffold the FastAPI backend fresh (`main.py`, `db.py`, `llm.py`, `models.py` with camelCase aliases, `routes/`). Confirm `uvicorn` runs and CORS is open to the Electron dev origin.
 2. Scaffold Electron + React + TS with electron-vite, get a blank window rendering and hitting `GET /health` on the backend. Set up the preload bridge skeleton.

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db import init_db
 from app.models import HealthResponse
 from app.routes import notes, graph, sessions
+from app import screen
 
 app = FastAPI()
 
@@ -27,3 +28,4 @@ def health():
 app.include_router(notes.router)
 app.include_router(graph.router)
 app.include_router(sessions.router)
+app.include_router(screen.router)
