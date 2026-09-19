@@ -88,7 +88,7 @@ def get_db():
 
 
 def init_db() -> None:
-    import app.db_models  # noqa: F401  (registers tables on Base)
+    import backend.app.db_models  # noqa: F401  (registers tables on Base)
     Base.metadata.create_all(bind=engine)
 ```
 
@@ -161,7 +161,7 @@ def create_note():
 ```python
 # backend/app/routes/graph.py
 from fastapi import APIRouter
-from app.models import CamelModel
+from backend.app.models import CamelModel
 
 router = APIRouter()
 
@@ -188,9 +188,9 @@ router = APIRouter()
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.db import init_db
-from app.models import HealthResponse
-from app.routes import notes, graph, sessions
+from backend.app.db import init_db
+from backend.app.models import HealthResponse
+from backend.app.routes import notes, graph, sessions
 
 app = FastAPI()
 
@@ -221,7 +221,7 @@ app.include_router(sessions.router)
 
 ```python
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 
@@ -448,7 +448,7 @@ git commit -m "feat: add dashboard with goal input and timestamp-based session t
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, JSON, Integer, Boolean
-from app.db import Base
+from backend.app.db import Base
 
 
 def gen_id() -> str:
@@ -563,8 +563,8 @@ Note: this seeding function only inserts `NoteORM`/`ConceptORM`/`NoteConceptORM`
 ```python
 def seed_if_empty(db) -> None:
     import json
-    from app.db_models import NoteORM, ConceptORM, NoteConceptORM, ConceptLinkORM
-    from app.concepts import normalize_concept_name
+    from backend.app.db_models import NoteORM, ConceptORM, NoteConceptORM, ConceptLinkORM
+    from backend.app.concepts import normalize_concept_name
 
     if db.query(NoteORM).first() is not None:
         return
@@ -634,7 +634,7 @@ Wire it into `init_db`:
 
 ```python
 def init_db() -> None:
-    import app.db_models  # noqa: F401
+    import backend.app.db_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -648,9 +648,9 @@ def init_db() -> None:
 ```python
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.db import get_db
-from app.db_models import NoteORM
-from app.models import CamelModel
+from backend.app.db import get_db
+from backend.app.db_models import NoteORM
+from backend.app.models import CamelModel
 
 router = APIRouter()
 
@@ -712,7 +712,7 @@ def create_note(body: CreateNoteRequest, db: Session = Depends(get_db)):
 
 ```python
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 
@@ -808,7 +808,7 @@ Today we're covering derivatives. Recall that a limit describes the value a func
 
 ```python
 import os
-from app import llm
+from backend.app import llm
 
 
 def test_summarize_fixture_mode_includes_seeded_concepts():
@@ -894,7 +894,7 @@ git commit -m "feat: wire Groq summarize call with fixture-mode fallback"
 - [ ] **Step 1: Write the failing test `backend/tests/test_concepts.py`**
 
 ```python
-from app.concepts import normalize_concept_name
+from backend.app.concepts import normalize_concept_name
 
 
 def test_normalize_strips_plural_on_last_word_only():
@@ -908,8 +908,8 @@ def test_normalize_keeps_special_endings_intact():
 
 
 def test_canonicalize_reuses_existing_concept(db_session):
-    from app.concepts import get_or_create_concept, canonicalize_note_concepts
-    from app.db_models import NoteORM, ConceptORM
+    from backend.app.concepts import get_or_create_concept, canonicalize_note_concepts
+    from backend.app.db_models import NoteORM, ConceptORM
 
     existing = ConceptORM(name="Limits", normalized_name="limit")
     db_session.add(existing)
@@ -936,8 +936,8 @@ Add a `db_session` pytest fixture in `backend/tests/conftest.py`:
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.db import Base
-import app.db_models  # noqa: F401
+from backend.app.db import Base
+import backend.app.db_models  # noqa: F401
 
 
 @pytest.fixture
@@ -958,7 +958,7 @@ Expected: FAIL (`get_or_create_concept`, `canonicalize_note_concepts` not define
 - [ ] **Step 3: Implement in `backend/app/concepts.py` (append)**
 
 ```python
-from app.db_models import ConceptORM, NoteConceptORM, ConceptLinkORM
+from backend.app.db_models import ConceptORM, NoteConceptORM, ConceptLinkORM
 
 
 def get_or_create_concept(db, name: str) -> ConceptORM:
@@ -1105,8 +1105,8 @@ git commit -m "feat: render note summary and mermaid flowchart from structured b
 
 ```python
 def test_related_notes_ranks_by_shared_concept_count(db_session):
-    from app.routes.notes import compute_related_note_ids
-    from app.db_models import NoteORM, ConceptORM, NoteConceptORM
+    from backend.app.routes.notes import compute_related_note_ids
+    from backend.app.db_models import NoteORM, ConceptORM, NoteConceptORM
 
     concept = ConceptORM(name="Limits", normalized_name="limit")
     db_session.add(concept)
@@ -1129,7 +1129,7 @@ def test_related_notes_ranks_by_shared_concept_count(db_session):
 
 ```python
 from sqlalchemy import func
-from app.db_models import NoteConceptORM, NoteORM
+from backend.app.db_models import NoteConceptORM, NoteORM
 
 
 def compute_related_note_ids(db, note_id: str, limit: int = 3) -> list[str]:
@@ -1193,7 +1193,7 @@ git commit -m "feat: compute related notes by shared concept count and generate 
 
 ```python
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 
@@ -1212,9 +1212,9 @@ def test_graph_includes_seeded_hub_concepts():
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.db import get_db
-from app.db_models import ConceptORM, NoteConceptORM, ConceptLinkORM
-from app.models import CamelModel
+from backend.app.db import get_db
+from backend.app.db_models import ConceptORM, NoteConceptORM, ConceptLinkORM
+from backend.app.models import CamelModel
 
 router = APIRouter()
 
@@ -1378,7 +1378,7 @@ git commit -m "feat: add floating pet window synced via IPC relay from main wind
 
 ```python
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 
@@ -1396,9 +1396,9 @@ def test_completing_session_increments_streak():
 ```python
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.db import get_db
-from app.db_models import SessionORM, PetStateORM
-from app.models import CamelModel
+from backend.app.db import get_db
+from backend.app.db_models import SessionORM, PetStateORM
+from backend.app.models import CamelModel
 
 router = APIRouter()
 
@@ -1630,7 +1630,7 @@ git commit -m "feat: add fail-closed allowlist gate and local doomscroll classif
 import json
 from pathlib import Path
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "fixtures" / "sample-screen-session"
@@ -1641,8 +1641,8 @@ def test_chunk_endpoint_never_persists_content(db_session_override):
     assert response.status_code == 200
     assert "doomscroll" in response.json()
     # no table stores raw chunk content — verify no new table row was created anywhere queryable
-    from app.db import SessionLocal
-    from app.db_models import NoteORM
+    from backend.app.db import SessionLocal
+    from backend.app.db_models import NoteORM
     db = SessionLocal()
     notes_with_chunk_content = db.query(NoteORM).filter(NoteORM.raw_content.contains("some allowed study content")).all()
     db.close()
@@ -1658,7 +1658,7 @@ def test_session_batch_creates_screen_capture_note():
 
 
 def test_doomscroll_classification_matches_fixture_expectations():
-    from app import llm
+    from backend.app import llm
     with open(FIXTURE_DIR / "chunks.json") as f:
         cases = json.load(f)["chunks"]
     for case in cases:
@@ -1740,11 +1740,11 @@ class ScreenSessionORM(Base):
 ```python
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.db import get_db
-from app.db_models import NoteORM, ConceptORM
-from app.models import CamelModel
-from app import llm, concepts
-from app.routes.notes import compute_related_note_ids, NoteResponse
+from backend.app.db import get_db
+from backend.app.db_models import NoteORM, ConceptORM
+from backend.app.models import CamelModel
+from backend.app import llm, concepts
+from backend.app.routes.notes import compute_related_note_ids, NoteResponse
 
 router = APIRouter()
 
@@ -1806,7 +1806,7 @@ Note: `raw_content` on a screen-capture note stores the *allowed* chunk text tha
 - [ ] **Step 7: Register the router in `backend/app/main.py`**
 
 ```python
-from app import screen
+from backend.app import screen
 ...
 app.include_router(screen.router)
 ```
