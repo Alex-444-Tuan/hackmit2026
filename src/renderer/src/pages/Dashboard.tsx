@@ -55,6 +55,13 @@ export default function Dashboard() {
 
   const mood: Mood = phase === 'running' ? 'studying' : phase === 'done' ? 'celebrating' : 'idle'
   const progress = totalMs === 0 ? 0 : 1 - remainingMs / totalMs
+  const secondsLeft = Math.max(0, Math.ceil(remainingMs / 1000))
+
+  // Push state to the floating pet window. secondsLeft only changes once a
+  // second, so this fires about once a second rather than on every tick.
+  useEffect(() => {
+    window.studypet?.sendSessionState({ mood, secondsLeft, streak })
+  }, [mood, secondsLeft, streak])
 
   const ring = useMemo(() => {
     const radius = 104
@@ -68,6 +75,7 @@ export default function Dashboard() {
     setTotalMs(duration)
     setRemainingMs(duration)
     setPhase('running')
+    window.studypet?.showPet()
   }
 
   function pauseSession() {
@@ -86,6 +94,7 @@ export default function Dashboard() {
     endAtRef.current = null
     setPhase('setup')
     setRemainingMs(minutes * 60_000)
+    window.studypet?.hidePet()
   }
 
   return (
