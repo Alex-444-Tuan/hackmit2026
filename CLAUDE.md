@@ -273,7 +273,6 @@ Work top to bottom. After each step, the app should still run. Never leave it in
 
 ## Explicit non-goals: do not build these this weekend
 
-- Screen observation / detecting which other apps or sites are active. (Listening to StudyPet's **own** window focus/blur events for the nudge is allowed; see Pet behavior rules.)
 - Browser extension
 - TikTok or Canvas scraping of any kind
 - YouTube beyond a single user-pasted link: no channel/playlist/feed scraping, no video or audio download, no processing of video frames
@@ -284,6 +283,22 @@ Work top to bottom. After each step, the app should still run. Never leave it in
 - Complex pet gamification (shops, currencies, multiplayer)
 
 If an idea from the source brainstorm isn't in the "Build order" list above, it's explicitly out of scope for this build. Flag it back to the user rather than implementing it.
+
+## Screen capture (in scope, see docs/screen-capture-spec.md)
+
+The screen-observation non-goal above has been lifted for one specific, tightly-scoped feature: local, allowlist-gated screen watching, specified in full in `docs/screen-capture-spec.md` and `docs/privacy/*`. This is **not** a general license to observe other apps or sites — it is exactly the design in that spec, no more:
+
+- Active-window/tab classification happens **locally only** (`src/main/screenWatcher.ts`), via OS accessibility APIs — never pixels, never OCR.
+- A **fail-closed allowlist gate** must run and return before any chunk is captured or sent anywhere. Blocked contexts never leave the device; the doomscroll signal for blocked contexts is computed locally with zero network call.
+- Only allowlisted chunks are ever sent off-device (to Gemini, for classification and later batch extraction), and are deleted immediately on response — never persisted as a raw artifact.
+- Privacy-facing copy must follow `docs/privacy/privacy-messaging.md`'s framing exactly; never claim "zero third-party access."
+- New files: `src/main/screenWatcher.ts` (real-time path), `backend/app/screen.py` (`POST /screen/chunk`, `POST /screen/session-batch`), `llm.py` gains a Gemini client alongside Groq for this path only. `Note.source` gains `"screen-capture"`; new `screen_sessions` table. No new table for raw chunks — they are never persisted, per the retention rule.
+- Build order slot: after step 11 (session completion) is solid, as step 12/13-equivalent — do not start this before the core golden demo flow (steps 1–11) works end-to-end.
+
+Two items are still open and block implementation, not just polish (see `docs/screen-capture-spec.md`'s "Status vs. CLAUDE.md" section) — resolve with the user before writing code against them:
+
+1. Where the allowlist's user-editable settings surface lives (in-app screen vs. local config file), and what the default seed list is.
+2. Redaction's detection method for password fields / notification toasts (accessibility-tree inspection vs. a local vision heuristic) is not yet chosen.
 
 ## Pet behavior rules
 
