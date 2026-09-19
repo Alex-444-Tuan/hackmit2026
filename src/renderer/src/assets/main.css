@@ -439,3 +439,171 @@ input {
   color: #9fc4b5;
   cursor: not-allowed;
 }
+
+.note {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  user-select: text;
+}
+
+.note__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.note__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note__block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note__h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.note__summary {
+  margin: 0;
+  max-width: 62ch;
+  line-height: 1.65;
+}
+
+.note__questions {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text);
+  max-width: 62ch;
+  line-height: 1.55;
+}
+
+.note__questions li::marker {
+  color: var(--mint-dim);
+}
+
+.chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* flowchart */
+
+.flow {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.flow svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.flow__error {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid #6d3644;
+  border-radius: 9px;
+  background: #2b1a22;
+  color: #f0b6c0;
+  font-size: 13px;
+}
+
+/* related notes */
+
+.related {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.related__connection {
+  margin: 0;
+  padding: 13px 15px;
+  border-left: 2px solid var(--mint);
+  background: var(--surface);
+  border-radius: 0 9px 9px 0;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.related__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.related__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.related__item {
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 15px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: border-color 120ms ease;
+}
+
+.related__item:hover {
+  border-color: var(--mint-dim);
+}
+
+.related__name {
+  font-weight: 600;
+}
+
+.related__concepts {
+  color: var(--muted);
+  font-size: 13px;
+}

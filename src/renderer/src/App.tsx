@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import Capture from './pages/Capture'
+import NoteView from './pages/NoteView'
 import { checkHealth } from './api/client'
+import { DEMO_NOTE, DEMO_RELATED } from './fixtures/demoNote'
 
-type View = 'dashboard' | 'capture'
+type View = 'dashboard' | 'capture' | 'note'
 
 function App() {
   const [view, setView] = useState<View>('dashboard')
@@ -42,6 +44,9 @@ function App() {
           >
             Capture
           </button>
+          <button className={`nav__tab ${view === 'note' ? 'nav__tab--on' : ''}`} onClick={() => setView('note')}>
+            Note
+          </button>
         </nav>
 
         <span
@@ -52,7 +57,11 @@ function App() {
         </span>
       </header>
 
-      <main className="shell__body">{view === 'dashboard' ? <Dashboard /> : <Capture />}</main>
+      <main className="shell__body">
+        {view === 'dashboard' && <Dashboard />}
+        {view === 'capture' && <Capture onSaved={() => setView('note')} />}
+        {view === 'note' && <NoteView note={DEMO_NOTE} related={DEMO_RELATED} />}
+      </main>
     </div>
   )
 }
