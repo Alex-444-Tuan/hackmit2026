@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+groq
+google-genai
+python-dotenv
+youtube-transcript-api
+pytest
+httpx
